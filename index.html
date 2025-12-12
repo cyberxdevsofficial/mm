@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Glam Girl — Dress Up Competition</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --accent:#ff5a8a; --muted:#6b7280; --card:#ffffffcc; --radius:12px;
+}
+*{box-sizing:border-box; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+body{ margin:0; min-height:100vh; display:flex; gap:16px; padding:16px;
+  background-image: url('https://images.unsplash.com/photo-1472214103451-9374bd1c798e?q=80&w=1600&auto=format&fit=crop&ixlib=rb-4.0.3&s=2d2e54f8f7d7a31b7b92de38ed1a4d6a');
+  background-size:cover; background-position:center; color:#111827; align-items:flex-start;
+}
+
+/* layout */
+.panel{ background:var(--card); padding:12px; border-radius:var(--radius); box-shadow:0 8px 24px rgba(2,6,23,0.12); }
+.left, .right{ width:280px; max-height:82vh; overflow:auto; }
+.center{ flex:1; display:flex; flex-direction:column; align-items:center; gap:12px; }
+
+.header{ display:flex; gap:12px; align-items:center; justify-content:space-between; width:100%; }
+.title{ font-weight:700; font-size:18px; }
+.small{ font-size:13px; color:var(--muted); }
+
+.stage{ width:440px; height:640px; border-radius:12px; display:flex; align-items:center; justify-content:center; perspective:1200px; background:linear-gradient(180deg,#fff8, #ffffffaa); }
+.model{ width:340px; height:520px; transform-style:preserve-3d; transition:transform .28s ease; }
+
+.controls{ display:flex; gap:8px; }
+.btn{ background:var(--accent); color:white; border:none; padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:600; }
+.btn.ghost{ background:transparent; border:1px solid rgba(0,0,0,0.06); color:var(--muted); }
+
+.thumb{ width:64px; height:64px; border-radius:10px; overflow:hidden; display:inline-grid; place-items:center; cursor:pointer; border:2px solid transparent; }
+.thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+.thumb.active{ border-color:var(--accent); box-shadow:0 4px 12px rgba(255,90,138,0.12); }
+
+.row{ display:flex; gap:8px; align-items:center; }
+
+/* scoreboard */
+.scoreBox{ display:flex; gap:10px; align-items:center; justify-content:space-between; width:100%; }
+.timer{ font-weight:700; color:var(--accent); font-size:20px; }
+
+/* compact controls */
+.right .muted{ font-size:12px; color:var(--muted); margin-top:8px; }
+
+/* responsive */
+@media (max-width:980px){
+  body{ flex-direction:column; padding:12px; }
+  .left, .right{ width:100%; order:2; }
+  .center{ order:1; width:100%; }
+  .stage{ width:360px; height:540px; }
+  .model{ width:280px; height:440px; }
+}
+</style>
+</head>
+<body>
+
+  <!-- LEFT: Items + game info -->
+  <aside class="panel left">
+    <div class="header">
+      <div>
+        <div class="title">Glam Girl — Competition</div>
+        <div class="small">Recreate the target look to score points</div>
+      </div>
+      <div class="small">Rounds: <strong id="roundsTotal">5</strong></div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid #eee;margin:10px 0;"/>
+
+    <div>
+      <div style="margin-bottom:8px;"><strong>Target Look</strong></div>
+      <div id="targetPreview" style="display:flex;gap:8px;align-items:center;">
+        <!-- target preview rendered here -->
+      </div>
+      <div class="small" style="margin-top:8px;">You have a time limit to match hair, outfit color, lips, blush and accessory.</div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid #eee;margin:12px 0;"/>
+
+    <div style="margin-bottom:10px;">
+      <label><strong>Outfits</strong></label>
+      <div id="outfitList" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"></div>
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <label><strong>Hairstyles</strong></label>
+      <div id="hairList" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"></div>
+    </div>
+
+    <div>
+      <label><strong>Accessories</strong></label>
+      <div id="accList" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"></div>
+    </div>
+  </aside>
+
+  <!-- CENTER: Stage and competition controls -->
+  <main class="panel center">
+    <div class="scoreBox" style="width:100%;">
+      <div>
+        <div class="small">Round <span id="roundIdx">1</span>/<span id="rounds">5</span></div>
+        <div style="font-weight:700; font-size:18px;">Score: <span id="totalScore">0</span></div>
+      </div>
+      <div style="text-align:right;">
+        <div class="timer" id="timer">00:30</div>
+        <div class="small">Time left</div>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="model" id="model3d">
+        <!-- Inline SVG with colorable layers -->
+        <svg id="girlSVG" viewBox="0 0 300 480" width="340" height="520" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fashion model">
+          <defs><clipPath id="clipC"><rect x="0" y="160" width="300" height="320" rx="30"/></clipPath></defs>
+          <ellipse cx="150" cy="430" rx="90" ry="18" fill="rgba(0,0,0,0.12)"/>
+          <g id="modelRoot">
+            <g id="hairBack"><path d="M140 50c-30 0-70 20-76 60-6 40 4 70 30 100 22 26 40 30 46 30 6 0 24-4 46-30 26-30 36-60 30-100-6-40-46-60-76-60z" fill="#3b2b2a"/></g>
+            <g id="shoulders"></g>
+            <g id="outfit" clip-path="url(#clipC)"><path id="outfitShape" d="M70 190c0 0 8 120 80 120s80-120 80-120v160c0 6-10 18-20 18H90c-10 0-20-12-20-18V190z" fill="#f5a1c4"/><path d="M70 190c0 0 14 90 80 90s80-90 80-90" fill="rgba(0,0,0,0.06)"/></g>
+            <g id="body">
+              <path id="neck" d="M140 130c-6 0-10 6-10 10v10h40v-10c0-4-4-10-10-10z" fill="#f1c9b8"/>
+              <g id="face" transform="translate(80,30)">
+                <ellipse id="skinTone" cx="70" cy="110" rx="52" ry="68" fill="#f1c9b8"/>
+                <g id="eyes"><ellipse cx="45" cy="110" rx="8" ry="5" fill="#2b2b2b"/><ellipse cx="95" cy="110" rx="8" ry="5" fill="#2b2b2b"/><circle cx="47" cy="108" r="1.8" fill="#fff"/><circle cx="97" cy="108" r="1.8" fill="#fff"/></g>
+                <path id="lips" d="M53 150c7 8 21 8 28 0 0 0-7 14-28 14s-28-14-28-14c8 8 21 8 28 0z" fill="#d66280"/>
+                <circle id="blushL" cx="36" cy="140" r="6" fill="#ffb4c2" opacity="0.6"/>
+                <circle id="blushR" cx="104" cy="140" r="6" fill="#ffb4c2" opacity="0.6"/>
+              </g>
+            </g>
+            <g id="hairFront"><path d="M80 60c16-20 80-40 120 10 10 12 18 30 18 46 0 0-12 8-20 6-18-4-26-18-48-18-18 0-24 12-44 12-20 0-36-20-40-30-4-10-4-36 14-42z" fill="#3b2b2a"/></g>
+            <g id="accessory" transform="translate(0,0)"><ellipse cx="150" cy="210" rx="28" ry="6" fill="rgba(255,210,135,0.95)" opacity="0.9" style="display:none"/></g>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <div style="width:100%; display:flex; justify-content:space-between; gap:8px;">
+      <div class="controls">
+        <button class="btn" id="startBtn">Start Game</button>
+        <button class="btn ghost" id="randomBtn">Randomize</button>
+        <button class="btn ghost" id="exportBtn">Export PNG</button>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;">
+        <label class="small">Round length</label>
+        <select id="roundLength">
+          <option value="30">30s</option>
+          <option value="45" selected>45s</option>
+          <option value="60">60s</option>
+        </select>
+      </div>
+    </div>
+  </main>
+
+  <!-- RIGHT: Makeup controls + leaderboard -->
+  <aside class="panel right">
+    <h3 style="margin:0 0 8px 0;">Makeup & Colors</h3>
+
+    <div style="margin-bottom:10px;">
+      <label class="small">Skin Tone</label>
+      <div style="display:flex; gap:8px; margin-top:6px;">
+        <div class="thumb swatch" data-skin="#f1c9b8" style="background:#f1c9b8"></div>
+        <div class="thumb swatch" data-skin="#e6b89a" style="background:#e6b89a"></div>
+        <div class="thumb swatch" data-skin="#cfa082" style="background:#cfa082"></div>
+        <div class="thumb swatch" data-skin="#f7dcc8" style="background:#f7dcc8"></div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:8px;">
+      <label class="small">Lip Color</label>
+      <input type="color" id="lipColor" value="#d66280" style="width:100%;height:36px;border-radius:8px;border:1px solid #eee"/>
+    </div>
+
+    <div style="margin-bottom:8px;">
+      <label class="small">Blush Color</label>
+      <input type="color" id="blushColor" value="#ffb4c2" style="width:100%;height:36px;border-radius:8px;border:1px solid #eee"/>
+    </div>
+
+    <div style="margin-bottom:8px;">
+      <label class="small">Hair Color</label>
+      <input type="color" id="hairColor" value="#3b2b2a" style="width:100%;height:36px;border-radius:8px;border:1px solid #eee"/>
+    </div>
+
+    <div style="margin-bottom:8px;">
+      <label class="small">Outfit Color</label>
+      <input type="color" id="outfitColor" value="#f5a1c4" style="width:100%;height:36px;border-radius:8px;border:1px solid #eee"/>
+    </div>
+
+    <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
+      <button class="btn ghost" id="neckToggle">Toggle Necklace</button>
+      <button class="btn ghost" id="glassesToggle">Toggle Glasses</button>
+    </div>
+
+    <hr style="border:none;border-top:1px solid #eee;margin:12px 0;"/>
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div><strong>Leaderboard</strong><div class="small">Top scores (local)</div></div>
+        <button class="btn" id="viewBoard">View</button>
+      </div>
+      <div id="leaderboard" style="margin-top:10px;"></div>
+    </div>
+
+  </aside>
+
+<script>
+/* -------------------------
+  Data assets (small set)
+   - uses internet image thumbs
+   ------------------------- */
+const outfits=[
+  {id:'pink',name:'Pink Dress',color:'#f5a1c4',thumb:'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=600&auto=format&fit=crop'},
+  {id:'blue',name:'Blue Dress',color:'#7cc8f5',thumb:'https://images.unsplash.com/photo-1520975919103-4c36d3f3ae8e?q=80&w=600&auto=format&fit=crop'},
+  {id:'gold',name:'Gold Jumpsuit',color:'#ffd29b',thumb:'https://images.unsplash.com/photo-1495121605193-b116b5b09f06?q=80&w=600&auto=format&fit=crop'}
+];
+const hairs=[
+  {id:'long',name:'Long Waves',color:'#3b2b2a',thumb:'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?q=80&w=600&auto=format&fit=crop'},
+  {id:'bob',name:'Bob Cut',color:'#5a3b3b',thumb:'https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=600&auto=format&fit=crop'}
+];
+const accs=[
+  {id:'none',name:'None',thumb:'https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=600&auto=format&fit=crop'},
+  {id:'ear',name:'Earrings',thumb:'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=600&auto=format&fit=crop'},
+  {id:'scarf',name:'Scarf',thumb:'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?q=80&w=600&auto=format&fit=crop'}
+];
+
+/* -------------------------
+  DOM refs
+------------------------- */
+const outfitList=document.getElementById('outfitList');
+const hairList=document.getElementById('hairList');
+const accList=document.getElementById('accList');
+const targetPreview=document.getElementById('targetPreview');
+
+const outfitShape=document.getElementById('outfitShape');
+const hairBack=document.getElementById('hairBack');
+const hairFront=document.getElementById('hairFront');
+const lips=document.getElementById('lips');
+const blushL=document.getElementById('blushL');
+const blushR=document.getElementById('blushR');
+const skinTone=document.getElementById('skinTone');
+const accessory=document.querySelector('#accessory ellipse');
+
+const lipColorInput=document.getElementById('lipColor');
+const blushColorInput=document.getElementById('blushColor');
+const hairColorInput=document.getElementById('hairColor');
+const outfitColorInput=document.getElementById('outfitColor');
+
+const timerEl=document.getElementById('timer');
+const startBtn=document.getElementById('startBtn');
+const randomBtn=document.getElementById('randomBtn');
+const exportBtn=document.getElementById('exportBtn');
+const roundLengthSelect=document.getElementById('roundLength');
+const roundsTotalEl=document.getElementById('roundsTotal');
+const roundIdxEl=document.getElementById('roundIdx');
+const roundsEl=document.getElementById('rounds');
+const totalScoreEl=document.getElementById('totalScore');
+const leaderboardEl=document.getElementById('leaderboard');
+const viewBoardBtn=document.getElementById('viewBoard');
+
+/* -------------------------
+  Populate UI thumbs
+------------------------- */
+function makeThumb(item){ const d=document.createElement('div'); d.className='thumb'; d.title=item.name; d.innerHTML=`<img src="${item.thumb}" alt="${item.name}">`; d.dataset.id=item.id; return d;}
+outfits.forEach(o=>{ const t=makeThumb(o); t.onclick=()=>{applyOutfit(o); markActive(outfitList,t);} ; outfitList.appendChild(t);});
+hairs.forEach(h=>{ const t=makeThumb(h); t.onclick=()=>{applyHair(h); markActive(hairList,t);} ; hairList.appendChild(t);});
+accs.forEach(a=>{ const t=makeThumb(a); t.onclick=()=>{applyAccessory(a); markActive(accList,t);} ; accList.appendChild(t);});
+
+function markActive(container,elem){ Array.from(container.children).forEach(c=>c.classList.remove('active')); elem.classList.add('active'); }
+
+/* -------------------------
+  Apply functions
+------------------------- */
+function applyOutfit(o){ outfitShape.setAttribute('fill', o.color || '#f5a1c4'); outfitColorInput.value = o.color || '#f5a1c4'; currentState.outfit = o.id; }
+function applyHair(h){ setHairColor(h.color || '#3b2b2a'); currentState.hair = h.id; /* simple visual tweak */ hairBack.style.opacity = h.id==='bob' ? '0.8':'1'; }
+function applyAccessory(a){ if(a.id==='none'){ accessory.style.display='none'; } else { accessory.style.display='block'; accessory.setAttribute('fill', a.id==='ear' ? 'rgba(255,210,135,0.95)' : 'rgba(200,230,255,0.9)'); } currentState.acc = a.id; }
+
+function setHairColor(hex){ hairBack.querySelectorAll('path').forEach(p=>p.setAttribute('fill',hex)); hairFront.querySelectorAll('path').forEach(p=>p.setAttribute('fill',hex)); hairBack.setAttribute('fill',hex); hairFront.setAttribute('fill',hex); }
+
+/* color inputs */
+lipColorInput.addEventListener('input', e=>{ lips.setAttribute('fill', e.target.value); currentState.lips = e.target.value; });
+blushColorInput.addEventListener('input', e=>{ blushL.setAttribute('fill', e.target.value); blushR.setAttribute('fill', e.target.value); currentState.blush = e.target.value; });
+hairColorInput.addEventListener('input', e=>{ setHairColor(e.target.value); currentState.hairColor = e.target.value; });
+outfitColorInput.addEventListener('input', e=>{ outfitShape.setAttribute('fill', e.target.value); currentState.outfitColor = e.target.value; });
+
+document.querySelectorAll('.swatch[data-skin]').forEach(s=>s.addEventListener('click', e=>{ const c=e.currentTarget.getAttribute('data-skin'); skinTone.setAttribute('fill',c); document.getElementById('neck').setAttribute('fill',c); currentState.skin = c; }));
+
+document.getElementById('neckToggle').addEventListener('click', ()=>{ accessory.style.display = accessory.style.display==='block' ? 'none' : 'block'; });
+let glassesOn=false;
+document.getElementById('glassesToggle').addEventListener('click', ()=>{
+  glassesOn=!glassesOn;
+  if(glassesOn){
+    if(!document.getElementById('glasses')){
+      const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('id','glasses');
+      g.innerHTML = `<rect x="38" y="100" rx="6" ry="6" width="28" height="12" fill="rgba(10,10,10,0.12)"/><rect x="94" y="100" rx="6" ry="6" width="28" height="12" fill="rgba(10,10,10,0.12)"/><path d="M66 106h18" stroke="rgba(10,10,10,0.12)" stroke-width="2"/>`;
+      document.getElementById('face').appendChild(g);
+    }
+  } else { const g=document.getElementById('glasses'); if(g) g.remove(); }
+});
+
+/* -------------------------
+  Competition logic
+------------------------- */
+
+let gameActive=false;
+let timer=null;
+let timeLeft=45;
+let currentRound=1;
+let roundsTotal=5;
+let totalScore=0;
+
+/* state of current user's model */
+const currentState = {
+  outfit: outfits[0].id,
+  hair: hairs[0].id,
+  acc: accs[0].id,
+  lips: '#d66280',
+  blush: '#ffb4c2',
+  hairColor: '#3b2b2a',
+  outfitColor: '#f5a1c4',
+  skin: '#f1c9b8'
+};
+
+/* target look for round */
+let targetLook=null;
+
+/* helper: random target */
+function randomTarget(){
+  const o = outfits[Math.floor(Math.random()*outfits.length)];
+  const h = hairs[Math.floor(Math.random()*hairs.length)];
+  const a = accs[Math.floor(Math.random()*accs.length)];
+  // colors: use exact outfit/hair colors plus random lip/blush variations
+  const lip = randomColor();
+  const blush = randomColor();
+  return { outfit:o.id, outfitColor:o.color, outfitName:o.name, hair:h.id, hairColor:h.color, hairName:h.name, acc:a.id, accName:a.name, lips:lip, blush:blush, skin:'#f1c9b8' };
+}
+
+/* render target preview */
+function renderTargetPreview(t){
+  targetPreview.innerHTML='';
+  const makeCard=(label, color, thumbTxt)=>{
+    const c=document.createElement('div'); c.style=minCardStyle; c.innerHTML=`<div style="font-size:12px;margin-bottom:6px">${label}</div><div style="width:80px;height:80px;border-radius:8px;background:${color};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700">${thumbTxt}</div>`;
+    return c;
+  };
+  const minCardStyle='display:flex;flex-direction:column;align-items:flex-start;gap:6px;';
+  targetPreview.appendChild(makeCard('Outfit', targetLook.outfitColor, targetLook.outfitName));
+  targetPreview.appendChild(makeCard('Hair', targetLook.hairColor, targetLook.hairName));
+  targetPreview.appendChild(makeCard('Lips', targetLook.lips, 'LIP'));
+  targetPreview.appendChild(makeCard('Blush', targetLook.blush, 'BL'));
+  targetPreview.appendChild(makeCard('Acc', targetLook.acc==='none' ? '#ddd' : (targetLook.acc==='ear' ? '#ffd' : '#9dd'), targetLook.accName));
+}
+
+/* scoring: simple color distance + accessory + hair/outfit id match */
+function scoreAgainstTarget(){
+  let score=0; const max=100;
+  // outfit color similarity (40% weight)
+  const outfitDist = colorDistance(hexToRgb(currentState.outfitColor), hexToRgb(targetLook.outfitColor));
+  const outfitScore = Math.max(0, 40*(1 - outfitDist/441)); // 441 ~ max RGB distance * sqrt(3)? normalized
+  // hair color (20% weight)
+  const hairDist = colorDistance(hexToRgb(currentState.hairColor), hexToRgb(targetLook.hairColor));
+  const hairScore = Math.max(0, 20*(1 - hairDist/441));
+  // lips color (15%)
+  const lipsDist = colorDistance(hexToRgb(currentState.lips), hexToRgb(targetLook.lips));
+  const lipsScore = Math.max(0, 15*(1 - lipsDist/441));
+  // blush color (10%)
+  const blushDist = colorDistance(hexToRgb(currentState.blush), hexToRgb(targetLook.blush));
+  const blushScore = Math.max(0, 10*(1 - blushDist/441));
+  // accessory match (10%)
+  const accScore = (currentState.acc === targetLook.acc) ? 10 : 0;
+  // hair/outfit exact id match bonus (5%)
+  const idBonus = (currentState.hair === targetLook.hair && currentState.outfit === targetLook.outfit) ? 5 : 0;
+
+  score = outfitScore + hairScore + lipsScore + blushScore + accScore + idBonus;
+  // normalize to integer
+  return Math.round(score);
+}
+
+/* color helpers */
+function hexToRgb(hex){ if(!hex) return {r:0,g:0,b:0}; hex = hex.replace('#',''); if(hex.length===3) hex=hex.split('').map(c=>c+c).join(''); return {r:parseInt(hex.substr(0,2),16),g:parseInt(hex.substr(2,2),16),b:parseInt(hex.substr(4,2),16)}; }
+function colorDistance(a,b){ return Math.sqrt(Math.pow(a.r-b.r,2)+Math.pow(a.g-b.g,2)+Math.pow(a.b-b.b,2)); }
+function randomColor(){ return '#'+Math.floor(Math.random()*16777215).toString(16).padStart(6,'0'); }
+
+/* game flow */
+function startGame(){
+  if(gameActive) return;
+  totalScore=0; totalScoreEl.textContent='0'; currentRound=1;
+  roundsTotal = parseInt(roundsTotalEl.textContent) || 5; roundsEl.textContent = roundsTotal;
+  nextRound();
+}
+
+function nextRound(){
+  if(currentRound>roundsTotal){ endGame(); return; }
+  // set currentRound UI
+  roundIdxEl.textContent = currentRound;
+  // create target
+  targetLook = randomTarget();
+  renderTargetPreview(targetLook);
+  // reset player to defaults for fairness (you may let players keep)
+  resetToDefaults();
+  // start timer
+  timeLeft = parseInt(roundLengthSelect.value || 45);
+  updateTimerDisplay();
+  gameActive = true;
+  timer = setInterval(()=>{
+    timeLeft--;
+    updateTimerDisplay();
+    if(timeLeft<=0){
+      clearInterval(timer);
+      timer=null;
+      // evaluate
+      const pts = scoreAgainstTarget();
+      totalScore += pts;
+      totalScoreEl.textContent = totalScore;
+      alert(`Round ${currentRound} finished! You scored ${pts} points.`);
+      currentRound++;
+      // slight pause then next round
+      setTimeout(()=>{ nextRound(); }, 500);
+    }
+  },1000);
+}
+
+function endGame(){
+  gameActive=false;
+  clearInterval(timer); timer=null;
+  // Final score
+  const name = prompt('Game over! Enter your name for the leaderboard:', 'Player') || 'Player';
+  saveScore({name: name, score: totalScore, date: new Date().toISOString()});
+  renderLeaderboard();
+  alert('Final score: ' + totalScore);
+}
+
+/* restart/utility */
+function updateTimerDisplay(){
+  const mm = Math.floor(timeLeft/60).toString().padStart(2,'0');
+  const ss = (timeLeft%60).toString().padStart(2,'0');
+  timerEl.textContent = `${mm}:${ss}`;
+}
+function resetToDefaults(){
+  // reset UI controls and currentState
+  outfitColorInput.value = '#f5a1c4'; outfitShape.setAttribute('fill','#f5a1c4'); currentState.outfitColor='#f5a1c4';
+  hairColorInput.value = '#3b2b2a'; setHairColor('#3b2b2a'); currentState.hairColor='#3b2b2a';
+  lipColorInput.value = '#d66280'; lips.setAttribute('fill','#d66280'); currentState.lips='#d66280';
+  blushColorInput.value = '#ffb4c2'; blushL.setAttribute('fill','#ffb4c2'); blushR.setAttribute('fill','#ffb4c2'); currentState.blush='#ffb4c2';
+  accessory.style.display='none'; currentState.acc='none';
+  // set outfit/hair defaults
+  currentState.outfit = outfits[0].id; currentState.hair = hairs[0].id;
+  // clear active thumbs
+  Array.from(document.querySelectorAll('.thumb')).forEach(t=>t.classList.remove('active'));
+  markActive(outfitList, outfitList.children[0]);
+  markActive(hairList, hairList.children[0]);
+  markActive(accList, accList.children[0]);
+}
+
+/* -------------------------
+  Leaderboard (localStorage)
+------------------------- */
+function saveScore(entry){
+  const key='glam_leaderboard_v1';
+  const data = JSON.parse(localStorage.getItem(key) || '[]');
+  data.push(entry);
+  data.sort((a,b)=>b.score - a.score);
+  // keep top 20
+  localStorage.setItem(key, JSON.stringify(data.slice(0,20)));
+}
+function getScores(){ const key='glam_leaderboard_v1'; return JSON.parse(localStorage.getItem(key) || '[]'); }
+function renderLeaderboard(){
+  const data=getScores();
+  leaderboardEl.innerHTML='';
+  if(data.length===0){ leaderboardEl.innerHTML='<div class="small">No scores yet — play to add yours!</div>'; return; }
+  const ul=document.createElement('ol'); ul.style.margin='8px 0 0 16px';
+  data.slice(0,10).forEach(d=>{ const li=document.createElement('li'); li.style.marginBottom='6px'; li.textContent = `${d.name} — ${d.score}`; ul.appendChild(li); });
+  leaderboardEl.appendChild(ul);
+}
+viewBoardBtn.addEventListener('click', renderLeaderboard);
+
+/* -------------------------
+  Export PNG (stage snapshot)
+------------------------- */
+exportBtn.addEventListener('click', async ()=>{
+  const svg=document.getElementById('girlSVG');
+  const serializer=new XMLSerializer();
+  const svgStr=serializer.serializeToString(svg);
+  const img=new Image();
+  const svgBlob=new Blob([svgStr], {type:'image/svg+xml;charset=utf-8'});
+  const url=URL.createObjectURL(svgBlob);
+  img.onload = ()=>{
+    const w=svg.clientWidth, h=svg.clientHeight+40;
+    const c=document.createElement('canvas'); c.width=w*2; c.height=h*2;
+    const ctx=c.getContext('2d');
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height);
+    ctx.drawImage(img, (c.width-(w*2))/2, 20, w*2, h*2-40);
+    const link=document.createElement('a'); link.download='glam.png'; link.href=c.toDataURL('image/png'); link.click();
+    URL.revokeObjectURL(url);
+  };
+  img.crossOrigin='anonymous'; img.src=url;
+});
+
+/* -------------------------
+  Buttons
+------------------------- */
+startBtn.addEventListener('click', ()=>{ if(!gameActive) startGame(); else { // allow early end of round
+  if(confirm('End current game early?')){ clearInterval(timer); timer=null; endGame(); }
+}});
+
+randomBtn.addEventListener('click', ()=>{ // just randomize player's look
+  const o=outfits[Math.floor(Math.random()*outfits.length)];
+  const h=hairs[Math.floor(Math.random()*hairs.length)];
+  const a=accs[Math.floor(Math.random()*accs.length)];
+  applyOutfit(o); applyHair(h); applyAccessory(a);
+  lipColorInput.value = randomColor(); lipColorInput.dispatchEvent(new Event('input'));
+  blushColorInput.value = randomColor(); blushColorInput.dispatchEvent(new Event('input'));
+});
+
+roundLengthSelect.addEventListener('change', ()=>{ updateTimerDisplay(); });
+
+/* -------------------------
+  Init defaults + target + render board
+------------------------- */
+resetToDefaults();
+targetLook = randomTarget(); renderTargetPreview(targetLook);
+roundsTotalEl.textContent = '5'; roundsEl.textContent = roundsTotalEl.textContent;
+renderLeaderboard();
+totalScoreEl.textContent='0';
+
+/* small utility to ensure thumbs have crossOrigin to reduce taint */
+Array.from(document.querySelectorAll('.thumb img')).forEach(i=>i.setAttribute('crossorigin','anonymous'));
+
+/* End of script */
+</script>
+
+</body>
+</html>
